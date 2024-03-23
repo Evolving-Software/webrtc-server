@@ -9,6 +9,7 @@ COPY Cargo.toml ./
 
 # Copy the source code
 COPY src ./src
+COPY templates ./templates
 
 
 # Build the dependencies
