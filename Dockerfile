@@ -5,13 +5,11 @@ FROM rust:latest
 WORKDIR /usr/src/webrtc-streaming
 
 # Copy the Cargo.toml and Cargo.lock files
-COPY Cargo.toml .env rustyroad.toml ./
+COPY Cargo.toml ./
 
 # Copy the source code
 COPY src ./src
-COPY .cargo ./.cargo
-COPY config ./config
-COPY static ./static
+
 
 # Build the dependencies
 RUN apt-get update && \
