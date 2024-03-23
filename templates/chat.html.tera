@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WebRTC Chat example</title>
+    <style>
+        body {
+            background: black;
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+<label for="session">Session: </label>
+<input type="number" id="session"></input>
+<button id="join" onClick="startRtc()">Join</button>
+<button id="leave" onClick="leaveRtc()" disabled>Leave</button>
+<button id="cam" onClick="startCam()" disabled>Cam</button>
+<button id="mic" onClick="startMic()" disabled>Mic</button>
+Status: <span id="ice_status">Waiting</span>
+<div id="chan_status">Click Join Button...</div>
+<div id="media"></div>
+<script src="/static/js/chat.js"></script>
+</body>
+
+</html>

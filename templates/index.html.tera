@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Live User Counter</title> 
+</head>
+<body>
+    <h1>Active Users: <span id="activeUsers">0</span></h1>
+    <button id="startButton">Start</button>
+    <button id="stopButton">Stop</button>
+    <video id="videoElement" width="640" height="480" autoplay muted></video>
+    <script src="/static/js/index.js"></script>
+</body>
+</html>
