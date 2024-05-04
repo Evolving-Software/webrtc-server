@@ -1,5 +1,5 @@
 [package]
-name = "webrtc-streaming"
+name = "webrtc-streaming-actix"
 version = "0.1.0"
 edition = "2021"
 
