@@ -1,121 +1,98 @@
-document.addEventListener('DOMContentLoaded', function () {
-    const videoElement = document.querySelector('video');
-    let socket;
-    let peerConnection;
+const videoElement = document.querySelector('video');
+let mediaSource = new MediaSource();
+videoElement.src = URL.createObjectURL(mediaSource);
+let sourceBuffer;
 
-    // Code related to <select> elements and getUserMedia goes here
-    const audioSelect = document.querySelector("select#audioSource");
-    const videoSelect = document.querySelector("select#videoSource");
 
-    if (audioSelect && videoSelect) {
-        audioSelect.onchange = getStream;
-        videoSelect.onchange = getStream;
-
-        getStream()
-            .then(getDevices)
-            .then(gotDevices);
-    } else {
-        console.error("Audio/Video source selectors not found!");
+// Assuming WebSocket connection is already established as 'ws'
+const canvas = document.getElementById('videoCanvas');
+const ctx = canvas.getContext('2d');
+let videoDecoder = new VideoDecoder({
+    output(frame) {
+        // Handle the decoded frame, e.g., draw it on a canvas
+        // Note: 'frame' needs to be closed to release system resources
+        ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+        frame.close(); // It's important to close the frame when done
+    },
+    error(e) {
+        console.error('VideoDecoder error:', e);
     }
-     
-
-    // Establish the WebSocket connection
-    const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const wsPath = `${wsScheme}://${window.location.host}/ws`;
-    socket = new WebSocket(wsPath);
-
-    // Handle WebSocket connection open
-    socket.onopen = function () {
-        console.log('WebSocket connection opened');
-    };
-
-    // Handle incoming messages from the server
-    socket.onmessage = function (event) {
-        const message = JSON.parse(event.data);
-        if (message.type === 'offer') {
-            console.log('Received offer');
-
-            if (peerConnection) {
-                console.warn('PeerConnection already exists. Ignoring offer.');
-                return;
-            }
-
-            peerConnection = new RTCPeerConnection();
-
-            peerConnection.setRemoteDescription(new RTCSessionDescription(message.data))
-                .then(() => {
-                    console.log('Remote description set successfully. Creating answer...');
-                    return peerConnection.createAnswer();
-                })
-                .then(answer => {
-                    console.log('Answer created:', answer);
-                    return peerConnection.setLocalDescription(answer);
-                })
-                .then(() => {
-                    console.log('Local description set successfully.');
-                    socket.send(JSON.stringify({ type: 'answer', data: peerConnection.localDescription }));
-                })
-                .catch(error => {
-                    console.error('Error processing offer and creating answer:', error);
-                });
-
-            peerConnection.onicecandidate = event => {
-                if (event.candidate) {
-                    console.log('Sending ICE candidate:', event.candidate);
-                    socket.send(JSON.stringify({ type: 'candidate', data: event.candidate }));
-                }
-            };
-            peerConnection.oniceconnectionstatechange = () => console.log(peerConnection.iceConnectionState);
-
-            peerConnection.onconnectionstatechange = () => console.log(peerConnection.connectionState);
-
-            peerConnection.ontrack =  gotRemoteStream;
-
-
-        } else if (message.type === 'candidate') {
-            console.log('Received ICE candidate:', message.data);
-            if (peerConnection) {
-                peerConnection.addIceCandidate(new RTCIceCandidate(message.data))
-                    .catch(error => {
-                        console.error('Error adding ICE candidate:', error);
-                    });
-            } else {
-                console.warn('PeerConnection does not exist. Ignoring candidate.');
-            }
-        }
-    };
-
-    videoElement.addEventListener('loadedmetadata', () => {
-        videoElement.play().catch(e => console.error('Error playing video after metadata load:', e));
-        console.log('Video metadata loaded');
-    });
-
-    videoElement.addEventListener('error', (e) => {
-        console.error('Video element error:', e);
-    });
-
-
-    // Handle WebSocket connection close
-    socket.onclose = function () {
-        console.log('WebSocket connection closed');
-    };
-    // WebSocket and PeerConnection code goes here
-
-    function gotRemoteStream(event) {
-        console.log('Received remote stream');
-        
-        // Make sure there's at least one stream
-        if (event.streams && event.streams[0]) {
-            console.log("Tracks in the stream:", event.streams[0].getTracks());
-            
-            // Check if the videoElement is already playing this stream
-            if (videoElement.srcObject !== event.streams[0]) {
-                console.log('Setting received stream as the source for the video element');
-                videoElement.srcObject = event.streams[0];
-            }
-        } else {
-            console.error('No stream received');
-        }
-    }
-    
 });
+
+// Configure the decoder to match the encoder settings
+// Make sure to adjust the codec and other parameters as needed
+videoDecoder.configure({
+    codec: 'vp8',
+    width: 640,
+    height: 480
+});
+
+
+mediaSource.addEventListener('sourceopen', function () {
+    // This will be executed once MediaSource is ready.
+    console.log('MediaSource opened');
+    sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs="vp8"');
+    sourceBuffer.addEventListener('updateend', () => {
+        if (mediaSource.readyState === 'open') {
+            mediaSource.endOfStream();
+        }
+    });
+});
+// Establish the WebSocket connection
+const wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+const wsPath = `${wsScheme}://${window.location.host}/ws`;
+
+let decoder;
+
+socket = new WebSocket(wsPath);
+socket.binaryType = 'arraybuffer';
+socket.onopen = function () {
+    console.log('WebSocket connection opened');
+    // Send a ping message to the server
+    socket.send('ping');
+};
+
+socket.onclose = function (event) {
+    console.log('WebSocket connection closed:', event);
+};
+
+
+socket.onmessage = async (event) => {
+
+    // Assuming 'data' is an ArrayBuffer containing the encoded video frame
+    // For simplicity, this example assumes the data is ready to be decoded without additional processing
+    // In practice, you may need to handle different data formats or include additional metadata
+    console.log(event);
+    if (event.data !== 'ping') {
+        let chunk = new EncodedVideoChunk({
+            type: 'key', // or 'delta' for non-key frames; might need additional logic to determine
+            timestamp: performance.now(), // Example timestamp; use actual frame timing
+            data: event.data // The actual encoded frame data
+        });
+
+        // Decode the chunk
+        videoDecoder.decode(chunk);
+    }
+};
+
+function sourceOpen() {
+    URL.revokeObjectURL(videoElement.src);
+    console.log('MediaSource readyState:', mediaSource.readyState);
+
+    try {
+        const sourceBuffer = mediaSource.addSourceBuffer('video/webm; codecs="vp8"');
+        sourceBuffer.addEventListener('updateend', function () {
+            if (mediaSource.readyState === 'open') {
+                mediaSource.endOfStream();
+            }
+        });
+        sourceBuffer.appendBuffer(event.data);
+    } catch (error) {
+        console.error('Error creating or appending to sourceBuffer:', error);
+    }
+}
+
+socket.onerror = function (error) {
+    console.error('WebSocket error:', error);
+};
+

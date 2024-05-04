@@ -1,7 +1,7 @@
 use sctp::EndpointConfig;
 pub use actix_web::{App, HttpServer, web};
 use clap::{arg, command, Parser};
-use log::{error, info};
+use log::error;
 use opentelemetry::{/*global,*/ KeyValue};
 use opentelemetry_sdk::metrics::{PeriodicReader, SdkMeterProvider};
 use opentelemetry_stdout::MetricsExporterBuilder;
@@ -13,8 +13,7 @@ use tera::Tera;
 use wg::WaitGroup;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::fs::File;
-use std::io::{BufReader, Error, ErrorKind, Read};
+use std::io::{Error, ErrorKind};
 use std::net::{SocketAddr, UdpSocket};
 use std::rc::Rc;
 use std::sync::mpsc::{Receiver, SyncSender};
@@ -29,15 +28,12 @@ use retty::channel::{InboundPipeline, Pipeline};
 use retty::transport::{TaggedBytesMut, TransportContext};
 use sfu::{DtlsHandler, ExceptionHandler, GatewayHandler, InterceptorHandler, SrtpHandler, StunHandler, DataChannelHandler, DemuxerHandler, RTCSessionDescription};
 
-mod util;
-mod messages;
-mod interceptors;
-mod types;
-mod metrics;
+pub mod util;
+pub mod messages;
+pub mod interceptors;
+pub mod types;
+pub mod metrics;
 
-
-
-use interceptors::*;
 use dtls::config;
 use dtls::extension::extension_use_srtp::SrtpProtectionProfile;
 use sfu::{RTCCertificate, SctpHandler, ServerConfig, ServerStates};
@@ -45,7 +41,7 @@ use sfu::{RTCCertificate, SctpHandler, ServerConfig, ServerStates};
 
 
 #[derive(Default, Debug, Copy, Clone, clap::ValueEnum)]
-enum Level {
+pub enum Level {
     Error,
     Warn,
     #[default]
@@ -71,26 +67,26 @@ impl From<Level> for log::LevelFilter {
 #[command(author = "Rusty Rain <y@ngr.tc>")]
 #[command(version = "0.1.0")]
 #[command(about = "An example of SFU Server", long_about = None)]
-struct Cli {
+pub struct Cli {
     #[arg(long, default_value_t = format!("127.0.0.1"))]
-    host: String,
+    pub host: String,
     #[arg(short, long, default_value_t = 8080)]
-    signal_port: u16,
+    pub signal_port: u16,
     #[arg(long, default_value_t = 3478)]
-    media_port_min: u16,
+    pub media_port_min: u16,
     #[arg(long, default_value_t = 3495)]
-    media_port_max: u16,
+    pub media_port_max: u16,
 
     #[arg(short, long)]
-    force_local_loop: bool,
+    pub force_local_loop: bool,
     #[arg(short, long)]
-    debug: bool,
+    pub debug: bool,
     #[arg(short, long, default_value_t = Level::Info)]
     #[clap(value_enum)]
-    level: Level,
+    pub level: Level,
 }
 
-fn init_meter_provider(
+pub fn init_meter_provider(
     mut _stop_rx: async_broadcast::Receiver<()>,
     _wait_group: WaitGroup,
 ) -> SdkMeterProvider {
@@ -131,26 +127,7 @@ async fn main() -> anyhow::Result<()> {
             .filter(None, cli.level.into())
             .init();
     }
-
-    let mut certs_file = BufReader::new(File::open("./src/util/cer.pem").unwrap());
-    let mut key_file = BufReader::new(File::open("./src/util/key.pem").unwrap());
-
-    // load TLS certs and key
-    // to create a self-signed temporary cert for testing:
-    // `openssl req -x509 -newkey rsa:4096 -nodes -keyout key.pem -out cert.pem -days 365 -subj '/CN=localhost'`
-    let tls_certs = rustls_pemfile::certs(&mut certs_file)
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap();
-    let tls_key = rustls_pemfile::pkcs8_private_keys(&mut key_file)
-        .next()
-        .unwrap()
-        .unwrap();
-
-    // set up TLS config options
-    let tls_config = rustls::ServerConfig::builder()
-        .with_no_client_auth()
-        .with_single_cert(tls_certs, rustls::pki_types::PrivateKeyDer::Pkcs8(tls_key))
-        .unwrap();
+    
     // Figure out some public IP address, since Firefox will not accept 127.0.0.1 for WebRTC traffic.
     let host_addr = if cli.host == "127.0.0.1" && !cli.force_local_loop {
         util::select_host_address()
@@ -275,7 +252,7 @@ pub struct SignalingMessage {
     pub response_tx: SyncSender<SignalingProtocolMessage>,
 }
 
-async fn index(tera: web::Data<Tera>) -> HttpResponse {
+pub async fn index(tera: web::Data<Tera>) -> HttpResponse {
     let rendered = tera.render("chat.html.tera", &tera::Context::new()).unwrap();
     HttpResponse::Ok().content_type("text/html").body(rendered)
 }
@@ -312,6 +289,7 @@ fn build_pipeline(local_addr: SocketAddr, server_states: Rc<RefCell<ServerStates
 
     pipeline.finalize()
 }
+
 fn write_socket_output(socket: &UdpSocket, pipeline: &Rc<Pipeline<TaggedBytesMut, TaggedBytesMut>>) -> anyhow::Result<()> {
     while let Some(transmit) = pipeline.poll_transmit() {
         socket.send_to(&transmit.message, transmit.transport.peer_addr)?;
@@ -319,6 +297,7 @@ fn write_socket_output(socket: &UdpSocket, pipeline: &Rc<Pipeline<TaggedBytesMut
 
     Ok(())
 }
+
 fn handle_offer_message(
     server_states: &Rc<RefCell<ServerStates>>,
     session_id: u64,
@@ -371,12 +350,7 @@ fn handle_offer_message(
     }
 }
 
-fn handle_leave_message(
-    _server_states: &Rc<RefCell<ServerStates>>,
-    session_id: u64,
-    endpoint_id: u64,
-    response_tx: SyncSender<SignalingProtocolMessage>,
-) -> anyhow::Result<()> {
+fn handle_leave_message(_server_states: &Rc<RefCell<ServerStates>>,  session_id: u64, endpoint_id: u64,  response_tx: SyncSender<SignalingProtocolMessage>) -> anyhow::Result<()> {
     let try_handle = || -> anyhow::Result<()> {
         log::info!("handle_leave_message: {}/{}", session_id, endpoint_id,);
         Ok(())
@@ -560,7 +534,7 @@ fn read_socket_input(socket: &UdpSocket, buf: &mut [u8]) -> Option<TaggedBytesMu
 
 
 
-async fn web_request(
+pub async fn web_request(
     req: HttpRequest,
     bytes: web::Bytes,
     path: web::Path<(String, u64, u64)>,
@@ -569,7 +543,7 @@ async fn web_request(
 ) -> HttpResponse {
     let (path, session_id, endpoint_id) = path.into_inner();
 
-    if req.method() == actix_web::http::Method::GET && path.is_empty() {
+    if req.method() == actix_web::http::Method::GET {
         let rendered = tera.render("chat.html.tera", &tera::Context::new()).unwrap();
         HttpResponse::Ok().content_type("text/html").body(rendered)
     } else if req.method() == actix_web::http::Method::POST {
@@ -579,7 +553,7 @@ async fn web_request(
         let port = sorted_ports[(session_id as usize) % sorted_ports.len()];
         let tx = media_port_thread_map.get(&port);
 
-        if let Some(tx) = tx {
+        if let Some(tx  ) = tx {
             let offer_sdp = bytes.to_vec();
 
             let (response_tx, response_rx) = mpsc::sync_channel(1);

@@ -11,6 +11,7 @@ let rtc = new RTCPeerConnection();
 rtc.oniceconnectionstatechange = () => {
     byId('ice_status').innerText = rtc.iceConnectionState;
     if (rtc.iceConnectionState == 'disconnected' || rtc.iceConnectionState == 'failed') {
+        console.log('ice connection failed');
         if (streamCam) {
             streamCam.getTracks()[0]?.stop();
         }
