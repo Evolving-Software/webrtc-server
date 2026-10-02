@@ -1,9 +1,14 @@
 [package]
 name = "webrtc-streaming-actix"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "WebRTC streaming server using actix-web"
 license = "MIT"
+exclude = [
+    ".codetether-agent/**",
+    ".codetether/**",
+    "src/util/key.pem",
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -61,7 +66,6 @@ tokio = { version = "1.36", features = ["full"] }
 tokio-util = "0.7"
 systemstat = "0.2.3"
 rustls-pemfile = "2.1.1"
-webtransport = "0.0.0"
 wtransport = "0.1.12"
 tracing = "0.1.40"
 http = "1.1.0"

@@ -65,7 +65,7 @@ impl From<Level> for log::LevelFilter {
 #[derive(Parser)]
 #[command(name = "SFU Server")]
 #[command(author = "Rusty Rain <y@ngr.tc>")]
-#[command(version = "0.1.0")]
+#[command(version)]
 #[command(about = "An example of SFU Server", long_about = None)]
 pub struct Cli {
     #[arg(long, default_value_t = format!("127.0.0.1"))]
